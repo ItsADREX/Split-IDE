@@ -8,11 +8,17 @@ export default function App() {
     const [files, setFiles] = useState([]);
     const [activeFile, setActiveFile] = useState(null);
     const [content, setContent] = useState('// React Code Editor Loaded\n');
-    const [fileCache, setFileCache] = useState({}); // { [filename]: content }
+    const [fileCache, setFileCache] = useState({});
     const [terminalLogs, setTerminalLogs] = useState([{ msg: "Split IDE terminal ready.", type: "success" }]);
 
     const [panels, setPanels] = useState({ explorer: true, ai: false, terminal: false });
     const debounceRef = useRef(null);
+
+    // Track the most recent activeFile and content to prevent React closure bugs when switching files
+    const stateRef = useRef({ activeFile: null, content: '' });
+    useEffect(() => {
+        stateRef.current = { activeFile, content };
+    }, [activeFile, content]);
 
     const logTerm = (msg, type = "normal") => {
         setTerminalLogs(prev => [...prev, { msg, type }]);
@@ -38,15 +44,20 @@ export default function App() {
         }
     };
 
-    const selectFile = async (filename) => {
-        // Save current active file to cache before switching
-        if (activeFile) {
-            setFileCache(prev => ({ ...prev, [activeFile]: content }));
+    const selectFile = async (filename, predefinedContent = null) => {
+        const curRef = stateRef.current;
+
+        // Save current active file explicitly to cache before switching utilizing fresh ref data
+        if (curRef.activeFile) {
+            setFileCache(prev => ({ ...prev, [curRef.activeFile]: curRef.content }));
         }
 
         setActiveFile(filename);
 
-        if (fileCache[filename] !== undefined) {
+        if (predefinedContent !== null) {
+            setContent(predefinedContent);
+            setFileCache(prev => ({ ...prev, [filename]: predefinedContent }));
+        } else if (fileCache[filename] !== undefined) {
             setContent(fileCache[filename]);
         } else {
             setContent('// Loading...');
@@ -62,7 +73,7 @@ export default function App() {
 
     const handleEditorChange = (value) => {
         setContent(value);
-        setFileCache(prev => ({ ...prev, [activeFile]: value })); // sync cache
+        setFileCache(prev => ({ ...prev, [activeFile]: value }));
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(async () => {
             await supabase.from('files').upsert({ filename: activeFile, content: value }, { onConflict: 'filename' });
@@ -73,7 +84,6 @@ export default function App() {
         logTerm(`> Executing ${activeFile}...`, "success");
 
         if (activeFile && activeFile.endsWith('.js')) {
-            // Capture console logs during execution
             const originalLog = console.log;
             console.log = (...args) => logTerm(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
             try {
@@ -90,10 +100,7 @@ export default function App() {
                 if (!window.pyodide) {
                     window.pyodide = await window.loadPyodide();
                 }
-
-                // Capture Python stdout
                 window.pyodide.setStdout({ batched: (msg) => logTerm(msg) });
-
                 await window.pyodide.runPythonAsync(content);
             } catch (err) {
                 logTerm(`Python Error: ${err.message}`, "error");
@@ -122,7 +129,6 @@ export default function App() {
         return <FileJson size={14} color="var(--color-muted)" />;
     };
 
-    // Editor Mount for custom dark theme config
     const handleEditorMount = (editor, monaco) => {
         monaco.editor.defineTheme('split-dark', {
             base: 'vs-dark',
@@ -142,10 +148,11 @@ export default function App() {
                 const reader = new FileReader();
                 reader.onload = async (re) => {
                     const name = file.name;
-                    await supabase.from('files').upsert({ filename: name, content: re.target.result }, { onConflict: 'filename' });
+                    const fileData = re.target.result || "";
+                    await supabase.from('files').upsert({ filename: name, content: fileData }, { onConflict: 'filename' });
                     if (!files.includes(name)) setFiles(prev => [...prev, name]);
-                    setFileCache(prev => ({ ...prev, [name]: re.target.result }));
-                    selectFile(name);
+                    // Directly select file and force rendering with new content
+                    selectFile(name, fileData);
                     logTerm(`Uploaded ${name}`, "success");
                 };
                 reader.readAsText(file);
@@ -157,11 +164,10 @@ export default function App() {
     const newFolder = () => {
         const f = prompt("Folder name:");
         if (f) {
-            // Mock folders by creating a ".keep" file and letting the UI list it
             const name = `${f}/.keep`;
-            setFiles([...files, name]);
-            setFileCache(prev => ({ ...prev, [name]: "// folder hook" }));
-            supabase.from('files').upsert({ filename: name, content: "// folder hook" }, { onConflict: 'filename' });
+            if (!files.includes(name)) setFiles([...files, name]);
+            selectFile(name, "// folder internal tracking file");
+            supabase.from('files').upsert({ filename: name, content: "// folder internal tracking file" }, { onConflict: 'filename' });
         }
     };
 
@@ -174,7 +180,7 @@ export default function App() {
                     <button className="action-btn" onClick={executeCode} style={{ backgroundColor: 'var(--color-neon-green)', color: 'var(--bg-main)', fontWeight: 800 }}>
                         <Play size={14} className="mr-1" /> RUN SCRIPT
                     </button>
-                    <button className="action-btn" onClick={() => { }} style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <button className="action-btn" onClick={() => logTerm("Preparing for Netlify API integration...", "success")} style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
                         <UploadCloud size={14} className="mr-1" /> PUBLISH
                     </button>
                     <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 8px' }} />
@@ -198,7 +204,7 @@ export default function App() {
                         <div className="flex justify-between items-center px-4 py-3" style={{ borderBottom: '1px solid var(--border-color)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '1px' }}>
                             <span>EXPLORER</span>
                             <div className="flex gap-2">
-                                <button className="icon-btn" title="New File" onClick={() => { const f = prompt("File name:"); if (f && !files.includes(f)) { setFiles([...files, f]); selectFile(f); } }}><FilePlus size={14} /></button>
+                                <button className="icon-btn" title="New File" onClick={() => { const f = prompt("File name:"); if (f && !files.includes(f)) { setFiles([...files, f]); selectFile(f, "// Blank File"); } }}><FilePlus size={14} /></button>
                                 <button className="icon-btn" title="New Folder" onClick={newFolder}><FolderPlus size={14} /></button>
                                 <button className="icon-btn" title="Upload" onClick={uploadFile}><Cloud size={14} /></button>
                             </div>
