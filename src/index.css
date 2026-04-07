@@ -178,4 +178,50 @@ body {
         padding: 12px 16px;
         min-height: 44px;
     }
+    
+    /* Mobile editor improvements */
+    .monaco-editor {
+        font-size: 16px !important;
+    }
+    
+    .monaco-editor .view-lines {
+        line-height: 1.6 !important;
+    }
+    
+    /* Mobile code toolbar styling */
+    .mobile-code-toolbar {
+        background: var(--bg-panel);
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .mobile-code-button {
+        background: var(--bg-hover);
+        border: 1px solid var(--border-color);
+        color: var(--color-text);
+        font-family: var(--font-code);
+        font-size: 14px;
+        min-height: 44px;
+        min-width: 44px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    
+    .mobile-code-button:active {
+        background: var(--bg-active);
+        transform: scale(0.95);
+    }
+    
+    /* Prevent text selection on toolbar */
+    .mobile-code-toolbar * {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+    
+    /* Better mobile scrolling */
+    .mobile-scroll {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
 }
