@@ -6,6 +6,7 @@ import Header from './components/Header';
 import ExplorerPanel from './components/ExplorerPanel';
 import TerminalPanel from './components/TerminalPanel';
 import FileTabs from './components/FileTabs';
+import PullToRefresh from './components/PullToRefresh';
 import './index.css';
 
 const AIPanel = lazy(() => import('./components/AIPanel'));
@@ -27,63 +28,75 @@ export default function App() {
         setPanels(curr => ({ ...curr, [p]: !curr[p] }));
     }, []);
 
-    const handleExecute = useCallback(() => {
-        runCode(fs.activeFile, fs.content, logTermWithPanel);
-    }, [fs.activeFile, fs.content, logTermWithPanel]);
+    const handleExecute = useCallback(async () => {
+        if (!fs.activeFile) {
+            logTerm("No file selected", "error");
+            return;
+        }
+        await runCode(fs.activeFile, fs.content, logTerm);
+    }, [fs.activeFile, fs.content, logTerm]);
+
+    const handleRefresh = useCallback(async () => {
+        // Simulate refresh delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        logTerm("App refreshed", "success");
+        // You can add actual refresh logic here like reloading files
+    }, [logTerm]);
 
     return (
-        <div className="flex flex-col h-full w-full">
-            <Header
-                panels={panels}
-                togglePanel={togglePanel}
-                executeCode={handleExecute}
-                uploadFile={fs.uploadFile}
-            />
+        <PullToRefresh onRefresh={handleRefresh}>
+            <div className="flex flex-col h-full w-full">
+                <Header
+                    panels={panels}
+                    togglePanel={togglePanel}
+                    executeCode={handleExecute}
+                    uploadFile={fs.uploadFile}
+                />
 
-            <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-                {/* Mobile Explorer Overlay */}
-                {panels.explorer && (
-                    <div className={`${panels.explorer ? 'block' : 'hidden'} md:block`}>
-                        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => togglePanel('explorer')}></div>
-                        <div className="md:relative md:w-64 fixed md:static inset-y-0 left-0 z-50 w-80 md:z-auto">
-                            <ExplorerPanel
-                                files={fs.files}
-                                activeFile={fs.activeFile}
-                                openFolders={fs.openFolders}
-                                selectFile={fs.selectFile}
-                                toggleFolder={fs.toggleFolder}
-                                handleDragStart={fs.handleDragStart}
-                                handleDrop={fs.handleDrop}
-                                newFile={fs.newFile}
-                                newFolder={fs.newFolder}
-                                uploadFile={fs.uploadFile}
-                                deleteFile={fs.deleteFile}
-                                renameFile={fs.renameFile}
-                                duplicateFile={fs.duplicateFile}
-                            />
+                <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+                    {/* Mobile Explorer Overlay */}
+                    {panels.explorer && (
+                        <div className={`${panels.explorer ? 'block' : 'hidden'} md:block`}>
+                            <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => togglePanel('explorer')}></div>
+                            <div className="md:relative md:w-64 fixed md:static inset-y-0 left-0 z-50 w-80 md:z-auto">
+                                <ExplorerPanel
+                                    files={fs.files}
+                                    activeFile={fs.activeFile}
+                                    openFolders={fs.openFolders}
+                                    selectFile={fs.selectFile}
+                                    toggleFolder={fs.toggleFolder}
+                                    handleDragStart={fs.handleDragStart}
+                                    handleDrop={fs.handleDrop}
+                                    newFile={fs.newFile}
+                                    newFolder={fs.newFolder}
+                                    uploadFile={fs.uploadFile}
+                                    deleteFile={fs.deleteFile}
+                                    renameFile={fs.renameFile}
+                                    duplicateFile={fs.duplicateFile}
+                                />
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                    <FileTabs
-                        openTabs={fs.openTabs}
-                        activeFile={fs.activeFile}
-                        onSelectTab={fs.selectFile}
-                        onCloseTab={fs.closeTab}
-                    />
-                    <Suspense fallback={
-                        <section className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)' }}>
-                            Loading editor...
-                        </section>
-                    }>
-                        <EditorPane
+                    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                        <FileTabs
+                            openTabs={fs.openTabs}
                             activeFile={fs.activeFile}
-                            content={fs.content}
-                            onChange={fs.handleEditorChange}
+                            onSelectTab={fs.selectFile}
+                            onCloseTab={fs.closeTab}
                         />
-                    </Suspense>
-                </div>
+                        <Suspense fallback={
+                            <section className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)' }}>
+                                Loading editor...
+                            </section>
+                        }>
+                            <EditorPane
+                                activeFile={fs.activeFile}
+                                content={fs.content}
+                                onChange={fs.handleEditorChange}
+                            />
+                        </Suspense>
+                    </div>
 
                 {/* Mobile AI Panel Overlay */}
                 {panels.ai && (
@@ -98,12 +111,13 @@ export default function App() {
                 )}
             </main>
 
-            {panels.terminal && (
-                <TerminalPanel
-                    terminalLogs={terminalLogs}
-                    onClose={() => togglePanel('terminal')}
-                />
-            )}
-        </div>
+                {panels.terminal && (
+                    <TerminalPanel
+                        terminalLogs={terminalLogs}
+                        onClose={() => togglePanel('terminal')}
+                    />
+                )}
+            </div>
+        </PullToRefresh>
     );
 }
