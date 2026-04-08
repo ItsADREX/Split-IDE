@@ -135,36 +135,7 @@ CREATE TRIGGER update_files_updated_at BEFORE UPDATE ON files
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Create default project for new users (function)
-CREATE OR REPLACE FUNCTION create_default_project_for_user()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO projects (user_id, name, description, is_default)
-    VALUES (NEW.id, 'My First Project', 'Welcome to Split-IDE! Start coding here.', true);
-    
-    -- Create a welcome file
-    INSERT INTO files (project_id, filename, content, file_type)
-    VALUES (
-        (SELECT id FROM projects WHERE user_id = NEW.id AND is_default = true LIMIT 1),
-        'welcome.js',
-        '// Welcome to Split-IDE!
-// This is your first project. You can:
-// 1. Create new files and folders
-// 2. Write and execute JavaScript and Python code
-// 3. Access your projects from any device
-// 4. Collaborate with others (coming soon)
-
-console.log("Hello, Split-IDE!");
-
-// Try running this code by clicking the RUN button!',
-        'javascript'
-    );
-    
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create trigger for new user default project
-CREATE TRIGGER create_default_project_trigger
-    AFTER INSERT ON auth.users
-    FOR EACH ROW EXECUTE FUNCTION create_default_project_for_user();
+-- NOTE: Default project creation is handled by the application code.
+-- Supabase does not allow triggers on auth.users from the SQL editor.
+-- When a user signs in for the first time, the app automatically creates
+-- a default project and welcome file for them.

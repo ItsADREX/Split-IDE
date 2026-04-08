@@ -2,7 +2,6 @@ import React, { useState, useCallback, lazy, Suspense } from 'react';
 import { useTerminal } from './hooks/useTerminal';
 import { useFileSystem } from './hooks/useFileSystem';
 import { executeCode as runCode } from './services/codeExecution';
-import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
 import ExplorerPanel from './components/ExplorerPanel';
 import TerminalPanel from './components/TerminalPanel';
@@ -37,7 +36,6 @@ export default function App() {
     }, [fs.activeFile, fs.content, logTerm]);
 
     return (
-        <AuthProvider>
             <div className="flex flex-col h-full w-full">
                 <Header
                     panels={panels}
@@ -111,6 +109,5 @@ export default function App() {
                     />
                 )}
             </div>
-        </AuthProvider>
     );
 }
