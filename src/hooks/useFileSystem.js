@@ -1,24 +1,51 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { createCloudFileSystem } from '../services/cloudFileSystem';
+import { useAuth } from '../contexts/AuthContext';
 
 const DEBOUNCE_SAVE_MS = 1500;
 const DEBOUNCE_LS_MS = 1500;
 
 export function useFileSystem(logTerm) {
+    const { user } = useAuth();
     const [files, setFiles] = useState([]);
     const [activeFile, setActiveFile] = useState(null);
     const [content, setContent] = useState('// React Code Editor Loaded\n');
     const [fileCache, setFileCache] = useState({});
     const [openFolders, setOpenFolders] = useState({});
     const [openTabs, setOpenTabs] = useState([]);
+    const [currentProject, setCurrentProject] = useState(null);
+    const [cloudFS, setCloudFS] = useState(null);
+    const [syncStatus, setSyncStatus] = useState('offline'); // offline, syncing, synced, error
 
     const debounceRef = useRef(null);
     const lsDebounceRef = useRef(null);
+    const cloudSyncRef = useRef(null);
     const stateRef = useRef({ activeFile: null, content: '' });
+    const subscriptionRef = useRef(null);
 
     useEffect(() => {
         stateRef.current = { activeFile, content };
     }, [activeFile, content]);
+
+    // Initialize cloud file system when user changes
+    useEffect(() => {
+        if (user?.id) {
+            const newCloudFS = createCloudFileSystem(user.id);
+            setCloudFS(newCloudFS);
+            setSyncStatus('syncing');
+            initializeUserProject(newCloudFS);
+        } else {
+            setCloudFS(null);
+            setCurrentProject(null);
+            setSyncStatus('offline');
+            // Clean up subscription
+            if (subscriptionRef.current) {
+                subscriptionRef.current.unsubscribe();
+                subscriptionRef.current = null;
+            }
+        }
+    }, [user]);
 
     const syncToLocalStorage = useCallback((cacheMap) => {
         clearTimeout(lsDebounceRef.current);
@@ -30,6 +57,138 @@ export function useFileSystem(logTerm) {
         }, DEBOUNCE_LS_MS);
     }, []);
 
+    const syncToCloud = useCallback((cacheMap) => {
+        if (!cloudFS || !currentProject?.id) return;
+        
+        clearTimeout(cloudSyncRef.current);
+        cloudSyncRef.current = setTimeout(async () => {
+            try {
+                setSyncStatus('syncing');
+                const result = await cloudFS.syncFiles(currentProject.id, cacheMap);
+                setSyncStatus(result.success ? 'synced' : 'error');
+                if (!result.success) {
+                    logTerm(`Sync failed: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                setSyncStatus('error');
+                logTerm(`Sync error: ${error.message}`, 'error');
+            }
+        }, DEBOUNCE_SAVE_MS);
+    }, [cloudFS, currentProject, logTerm]);
+
+    const initializeUserProject = useCallback(async (cloudFileSystem) => {
+        try {
+            // Get or create default project
+            let { data: project, error } = await cloudFileSystem.getDefaultProject();
+            
+            if (error || !project) {
+                // Create default project if it doesn't exist
+                const createResult = await cloudFileSystem.createProject(
+                    'My First Project', 
+                    'Welcome to Split-IDE! Start coding here.'
+                );
+                project = createResult.data;
+            }
+
+            if (project) {
+                setCurrentProject(project);
+                await loadProjectFiles(cloudFileSystem, project.id);
+                
+                // Set up real-time subscription
+                if (subscriptionRef.current) {
+                    subscriptionRef.current.unsubscribe();
+                }
+                subscriptionRef.current = cloudFileSystem.subscribeToProjectFiles(
+                    project.id,
+                    handleRealtimeUpdate
+                );
+            }
+        } catch (error) {
+            console.warn('Failed to initialize user project:', error);
+            setSyncStatus('error');
+        }
+    }, []);
+
+    const loadProjectFiles = useCallback(async (cloudFileSystem, projectId) => {
+        try {
+            const { data: cloudFiles, error } = await cloudFileSystem.getFiles(projectId);
+            if (error) throw error;
+
+            if (cloudFiles && cloudFiles.length > 0) {
+                // Convert cloud files to local format
+                const fileList = cloudFiles.map(f => {
+                    const fullPath = f.file_path ? `${f.file_path}/${f.filename}` : f.filename;
+                    return fullPath;
+                });
+                
+                const cache = {};
+                cloudFiles.forEach(f => {
+                    const fullPath = f.file_path ? `${f.file_path}/${f.filename}` : f.filename;
+                    cache[fullPath] = f.content || '';
+                });
+
+                setFiles(fileList);
+                setFileCache(cache);
+                
+                // Select first file if none selected
+                if (!activeFile && fileList.length > 0) {
+                    selectFile(fileList[0]);
+                }
+                
+                setSyncStatus('synced');
+            } else {
+                // No cloud files, load from localStorage as fallback
+                await fetchFiles();
+            }
+        } catch (error) {
+            console.warn('Failed to load project files:', error);
+            setSyncStatus('error');
+            // Fallback to localStorage
+            await fetchFiles();
+        }
+    }, [activeFile]);
+
+    const handleRealtimeUpdate = useCallback((payload) => {
+        const { eventType, new: newRecord, old: oldRecord } = payload;
+        
+        switch (eventType) {
+            case 'INSERT':
+            case 'UPDATE':
+                if (newRecord) {
+                    const fullPath = newRecord.file_path ? 
+                        `${newRecord.file_path}/${newRecord.filename}` : 
+                        newRecord.filename;
+                    
+                    setFiles(prev => {
+                        if (!prev.includes(fullPath)) {
+                            return [...prev, fullPath].sort();
+                        }
+                        return prev;
+                    });
+                    
+                    setFileCache(prev => ({
+                        ...prev,
+                        [fullPath]: newRecord.content || ''
+                    }));
+                }
+                break;
+            case 'DELETE':
+                if (oldRecord) {
+                    const fullPath = oldRecord.file_path ? 
+                        `${oldRecord.file_path}/${oldRecord.filename}` : 
+                        oldRecord.filename;
+                    
+                    setFiles(prev => prev.filter(f => f !== fullPath));
+                    setFileCache(prev => {
+                        const newCache = { ...prev };
+                        delete newCache[fullPath];
+                        return newCache;
+                    });
+                }
+                break;
+        }
+    }, []);
+
     const selectFile = useCallback((filename, predefinedContent = null) => {
         const curRef = stateRef.current;
 
@@ -37,6 +196,7 @@ export function useFileSystem(logTerm) {
             setFileCache(prev => {
                 const nc = { ...prev, [curRef.activeFile]: curRef.content };
                 syncToLocalStorage(nc);
+                syncToCloud(nc);
                 return nc;
             });
         }
@@ -58,7 +218,7 @@ export function useFileSystem(logTerm) {
                 return prev;
             });
         }
-    }, [syncToLocalStorage]);
+    }, [syncToLocalStorage, syncToCloud]);
 
     const fetchFiles = useCallback(async () => {
         let preloadedData = [];
@@ -114,25 +274,21 @@ export function useFileSystem(logTerm) {
         fetchFiles();
     }, [fetchFiles]);
 
-    const handleEditorChange = useCallback((value) => {
-        setContent(value);
-
-        setFileCache(prev => {
-            const nc = { ...prev, [stateRef.current.activeFile]: value };
-            syncToLocalStorage(nc);
-            return nc;
-        });
-
+    const handleEditorChange = useCallback((newContent) => {
+        setContent(newContent);
         clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(async () => {
-            try {
-                await supabase.from('files').upsert(
-                    { filename: stateRef.current.activeFile, content: value },
-                    { onConflict: 'filename' }
-                );
-            } catch (e) { }
+        debounceRef.current = setTimeout(() => {
+            const curRef = stateRef.current;
+            if (curRef.activeFile) {
+                setFileCache(prev => {
+                    const nc = { ...prev, [curRef.activeFile]: newContent };
+                    syncToLocalStorage(nc);
+                    syncToCloud(nc);
+                    return nc;
+                });
+            }
         }, DEBOUNCE_SAVE_MS);
-    }, [syncToLocalStorage]);
+    }, [syncToLocalStorage, syncToCloud]);
 
     const uploadFile = useCallback(() => {
         const input = document.createElement('input');
@@ -149,6 +305,7 @@ export function useFileSystem(logTerm) {
                     setFileCache(prev => {
                         const nc = { ...prev, [name]: fileData };
                         syncToLocalStorage(nc);
+                        syncToCloud(nc);
                         return nc;
                     });
                     selectFile(name, fileData);
@@ -162,15 +319,23 @@ export function useFileSystem(logTerm) {
             }
         };
         input.click();
-    }, [logTerm, selectFile, syncToLocalStorage]);
+    }, [logTerm, selectFile, syncToLocalStorage, syncToCloud]);
 
-    const newFile = useCallback(() => {
-        const f = prompt("File name (e.g. scripts/util.js):");
-        if (f && !files.includes(f)) {
-            setFiles(prev => [...prev, f]);
-            selectFile(f, "// Blank File");
+    const newFile = useCallback((filename) => {
+        if (files.includes(filename)) {
+            logTerm(`File ${filename} already exists`, "error");
+            return;
         }
-    }, [files, selectFile]);
+        setFiles(prev => [...prev, filename].sort());
+        setFileCache(prev => {
+            const nc = { ...prev, [filename]: '// New File\n' };
+            syncToLocalStorage(nc);
+            syncToCloud(nc);
+            return nc;
+        });
+        selectFile(filename, '// New File\n');
+        logTerm(`Created ${filename}`, "success");
+    }, [files, selectFile, syncToLocalStorage, syncToCloud, logTerm]);
 
     const newFolder = useCallback(() => {
         const f = prompt("Folder name:");
@@ -307,6 +472,7 @@ export function useFileSystem(logTerm) {
         setFileCache(prev => {
             const nc = { ...prev, [newName]: content };
             syncToLocalStorage(nc);
+            syncToCloud(nc);
             return nc;
         });
 
@@ -316,7 +482,7 @@ export function useFileSystem(logTerm) {
         } catch (err) {
             logTerm(`Failed to save duplicate to cloud`, "error");
         }
-    }, [files, fileCache, logTerm, syncToLocalStorage]);
+    }, [files, fileCache, logTerm, syncToLocalStorage, syncToCloud]);
 
     const handleDrop = useCallback(async (e, targetFolder) => {
         e.preventDefault();
@@ -371,6 +537,7 @@ export function useFileSystem(logTerm) {
                 delete newCache[u.old];
             });
             syncToLocalStorage(newCache);
+            syncToCloud(newCache);
             return newCache;
         });
 
@@ -383,26 +550,27 @@ export function useFileSystem(logTerm) {
                 }
             }
         } catch (err) { }
-    }, [files, logTerm, syncToLocalStorage, fileCache]);
+    }, [files, logTerm, syncToLocalStorage, syncToCloud, fileCache]);
 
     return {
         files,
         activeFile,
         content,
-        fileCache,
         openFolders,
         openTabs,
+        currentProject,
+        syncStatus,
         selectFile,
+        toggleFolder,
+        handleEditorChange,
+        handleDragStart,
+        handleDrop,
+        newFile,
+        newFolder,
+        uploadFile,
         closeTab,
         deleteFile,
         renameFile,
-        duplicateFile,
-        handleEditorChange,
-        uploadFile,
-        newFile,
-        newFolder,
-        toggleFolder,
-        handleDragStart,
-        handleDrop,
+        duplicateFile
     };
 }

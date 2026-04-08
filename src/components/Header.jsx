@@ -1,7 +1,13 @@
-import React, { memo } from 'react';
-import { Play, UploadCloud, Menu, TerminalSquare } from 'lucide-react';
+import React, { memo, useState } from 'react';
+import { Play, UploadCloud, Menu, TerminalSquare, LogIn } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import UserProfile from './UserProfile';
+import AuthModal from './AuthModal';
+import SyncStatus from './SyncStatus';
 
-const Header = memo(({ panels, togglePanel, executeCode, uploadFile }) => {
+const Header = memo(({ panels, togglePanel, executeCode, uploadFile, syncStatus }) => {
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const { user, loading } = useAuth();
     return (
         <header className="flex items-center px-4" style={{ backgroundColor: 'var(--bg-header)', borderBottom: '1px solid var(--border-color)', height: '50px' }}>
             {/* Desktop hamburger menu on the left */}
@@ -41,6 +47,26 @@ const Header = memo(({ panels, togglePanel, executeCode, uploadFile }) => {
                 <button className={`action-btn ${panels.ai ? 'active' : ''}`} onClick={() => togglePanel('ai')} style={{ color: 'var(--color-neon-green)' }}>
                     ✨ <span className="hidden lg:inline">AI</span>
                 </button>
+                
+                {/* Sync Status */}
+                <SyncStatus status={syncStatus} />
+                
+                {/* Authentication */}
+                <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 8px' }} />
+                {!loading && (
+                    user ? (
+                        <UserProfile />
+                    ) : (
+                        <button 
+                            className="action-btn" 
+                            onClick={() => setShowAuthModal(true)}
+                            style={{ color: 'var(--color-teal)' }}
+                        >
+                            <LogIn size={16} />
+                            <span className="hidden lg:inline ml-1">Sign In</span>
+                        </button>
+                    )
+                )}
             </div>
             
             {/* Mobile action buttons */}
@@ -54,7 +80,27 @@ const Header = memo(({ panels, togglePanel, executeCode, uploadFile }) => {
                 <button className={`action-btn ${panels.ai ? 'active' : ''}`} onClick={() => togglePanel('ai')} style={{ color: 'var(--color-neon-green)' }}>
                     ✨
                 </button>
+                
+                {/* Mobile Auth Button */}
+                {!loading && !user && (
+                    <button 
+                        className="action-btn" 
+                        onClick={() => setShowAuthModal(true)}
+                        style={{ color: 'var(--color-teal)' }}
+                    >
+                        <LogIn size={14} />
+                    </button>
+                )}
+                
+                {/* Mobile User Profile */}
+                {!loading && user && <UserProfile />}
             </div>
+            
+            {/* Auth Modal */}
+            <AuthModal 
+                isOpen={showAuthModal} 
+                onClose={() => setShowAuthModal(false)} 
+            />
         </header>
     );
 });

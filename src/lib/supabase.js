@@ -9,7 +9,14 @@ const createMockClient = () => ({
         select: () => Promise.resolve({ data: [], error: null }),
         upsert: () => Promise.resolve({ data: null, error: null }),
         delete: () => Promise.resolve({ data: null, error: null })
-    })
+    }),
+    auth: {
+        signUp: () => Promise.resolve({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+        signInWithPassword: () => Promise.resolve({ data: { user: null, session: null }, error: { message: 'Supabase not configured' } }),
+        signOut: () => Promise.resolve({ error: null }),
+        getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+        onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
+    }
 });
 
 // Only create real client if both URL and key are properly configured
@@ -18,3 +25,50 @@ export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== '
     : createMockClient()
 
 export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'undefined' && SUPABASE_ANON_KEY !== 'undefined')
+
+// Auth helper functions
+export const authHelpers = {
+    signUp: async (email, password) => {
+        const { data, error } = await supabase.auth.signUp({ 
+            email, 
+            password,
+            options: {
+                emailRedirectTo: window.location.origin
+            }
+        });
+        return { data, error };
+    },
+    signIn: async (email, password) => {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        return { data, error };
+    },
+    signInWithGoogle: async () => {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+        return { data, error };
+    },
+    signInWithGitHub: async () => {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'github',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+        return { data, error };
+    },
+    signOut: async () => {
+        const { error } = await supabase.auth.signOut();
+        return { error };
+    },
+    getSession: async () => {
+        const { data, error } = await supabase.auth.getSession();
+        return { data, error };
+    },
+    onAuthStateChange: (callback) => {
+        return supabase.auth.onAuthStateChange(callback);
+    }
+};
