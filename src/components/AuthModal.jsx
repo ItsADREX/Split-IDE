@@ -9,6 +9,7 @@ const AuthModal = memo(({ isOpen, onClose, initialMode = 'login' }) => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     const { signUp, signIn, signInWithGoogle, signInWithGitHub, isConfigured } = useAuth();
@@ -18,6 +19,7 @@ const AuthModal = memo(({ isOpen, onClose, initialMode = 'login' }) => {
         setPassword('');
         setConfirmPassword('');
         setError('');
+        setSuccessMessage('');
         setShowPassword(false);
     };
 
@@ -60,8 +62,8 @@ const AuthModal = memo(({ isOpen, onClose, initialMode = 'login' }) => {
             if (result.error) {
                 setError(result.error.message);
             } else {
-                if (mode === 'signup') {
-                    setError('Check your email for verification link');
+                if (mode === 'signup' && !result.data?.session) {
+                    setSuccessMessage('Account created! Check your email to verify, then sign in.');
                 } else {
                     handleClose();
                 }
@@ -187,6 +189,13 @@ const AuthModal = memo(({ isOpen, onClose, initialMode = 'login' }) => {
                     {error && (
                         <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
                             {error}
+                        </div>
+                    )}
+
+                    {/* Success Message */}
+                    {successMessage && (
+                        <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                            {successMessage}
                         </div>
                     )}
 

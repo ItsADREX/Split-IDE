@@ -26,36 +26,52 @@ const UserProfile = memo(() => {
     if (!user || loading) return null;
 
     const userEmail = user.email || 'User';
-    const userInitial = userEmail.charAt(0).toUpperCase();
+    const userName = user.user_metadata?.full_name || user.user_metadata?.name || userEmail.split('@')[0];
+    const userInitial = userName.charAt(0).toUpperCase();
+    const avatarUrl = user.user_metadata?.avatar_url;
 
     return (
         <div className="relative" ref={dropdownRef}>
             {/* Profile Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 action-btn"
-                style={{ padding: '6px 12px' }}
+                className="flex items-center gap-2 rounded-lg transition-colors"
+                style={{ 
+                    padding: '4px 8px',
+                    backgroundColor: isOpen ? 'var(--bg-hover)' : 'transparent',
+                    border: '1px solid',
+                    borderColor: isOpen ? 'var(--color-teal)' : 'var(--border-color)'
+                }}
             >
                 {/* Avatar */}
-                <div 
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{ 
-                        backgroundColor: 'var(--color-teal)', 
-                        color: 'var(--bg-main)' 
-                    }}
-                >
-                    {userInitial}
-                </div>
+                {avatarUrl ? (
+                    <img 
+                        src={avatarUrl} 
+                        alt={userName}
+                        className="w-7 h-7 rounded-full object-cover"
+                    />
+                ) : (
+                    <div 
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{ 
+                            backgroundColor: 'var(--color-teal)', 
+                            color: 'var(--bg-main)' 
+                        }}
+                    >
+                        {userInitial}
+                    </div>
+                )}
                 
-                {/* Email (desktop only) */}
-                <span className="hidden md:inline text-sm max-w-32 truncate">
-                    {userEmail}
+                {/* Name (desktop only) */}
+                <span className="hidden md:inline text-sm max-w-28 truncate" style={{ color: 'var(--color-text)' }}>
+                    {userName}
                 </span>
                 
                 {/* Chevron */}
                 <ChevronDown 
-                    size={14} 
-                    className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    size={12} 
+                    style={{ color: 'var(--color-muted)' }}
+                    className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
                 />
             </button>
 
@@ -72,21 +88,22 @@ const UserProfile = memo(() => {
                     {/* User Info */}
                     <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-color)' }}>
                         <div className="flex items-center gap-3">
-                            <div 
-                                className="w-8 h-8 rounded-full flex items-center justify-center font-bold"
-                                style={{ 
-                                    backgroundColor: 'var(--color-teal)', 
-                                    color: 'var(--bg-main)' 
-                                }}
-                            >
-                                {userInitial}
-                            </div>
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt={userName} className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                                <div 
+                                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+                                    style={{ backgroundColor: 'var(--color-teal)', color: 'var(--bg-main)' }}
+                                >
+                                    {userInitial}
+                                </div>
+                            )}
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>
-                                    {userEmail}
+                                <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text)' }}>
+                                    {userName}
                                 </p>
-                                <p className="text-xs" style={{ color: 'var(--color-muted)' }}>
-                                    Signed in
+                                <p className="text-xs truncate" style={{ color: 'var(--color-muted)' }}>
+                                    {userEmail}
                                 </p>
                             </div>
                         </div>
