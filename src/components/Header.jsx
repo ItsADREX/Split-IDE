@@ -4,6 +4,13 @@ import { Play, UploadCloud, Menu, TerminalSquare } from 'lucide-react';
 const Header = memo(({ panels, togglePanel, executeCode, uploadFile }) => {
     return (
         <header className="flex items-center px-4" style={{ backgroundColor: 'var(--bg-header)', borderBottom: '1px solid var(--border-color)', height: '50px' }}>
+            {/* Desktop hamburger menu on the left */}
+            <div className="hidden md:flex items-center gap-2">
+                <button className={`action-btn ${panels.explorer ? 'active' : ''}`} onClick={() => togglePanel('explorer')} title="Explorer">
+                    <Menu size={16} />
+                </button>
+            </div>
+            
             {/* Mobile hamburger menu on the left */}
             <div className="flex items-center gap-2 md:hidden">
                 <button className={`action-btn ${panels.explorer ? 'active' : ''}`} onClick={() => togglePanel('explorer')} title="Explorer">
@@ -12,7 +19,7 @@ const Header = memo(({ panels, togglePanel, executeCode, uploadFile }) => {
             </div>
             
             {/* Logo - centered on mobile, left on desktop */}
-            <div className="flex-1 md:flex-none font-bold tracking-wider text-center md:text-left" style={{ color: 'var(--color-text)' }}>
+            <div className="flex-1 md:flex-none font-bold tracking-wider text-center md:text-left md:ml-4" style={{ color: 'var(--color-text)' }}>
                 SPLIT<span style={{ color: 'var(--color-teal)', textShadow: '0 0 8px rgba(0, 240, 255, 0.4)' }}>IDE</span>
             </div>
             
@@ -28,9 +35,6 @@ const Header = memo(({ panels, togglePanel, executeCode, uploadFile }) => {
                     <span className="hidden lg:inline">UPLOAD</span>
                 </button>
                 <div style={{ width: 1, height: 20, background: 'var(--border-color)', margin: '0 8px' }} />
-                <button className={`action-btn ${panels.explorer ? 'active' : ''}`} onClick={() => togglePanel('explorer')} title="Explorer">
-                    <Menu size={16} />
-                </button>
                 <button className={`action-btn ${panels.terminal ? 'active' : ''}`} onClick={() => togglePanel('terminal')} title="Terminal">
                     <TerminalSquare size={16} />
                 </button>

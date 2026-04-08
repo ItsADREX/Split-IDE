@@ -63,13 +63,15 @@ export function useFileSystem(logTerm) {
     const fetchFiles = useCallback(async () => {
         let preloadedData = [];
         
+        // Only attempt Supabase connection if properly configured
         if (isSupabaseConfigured) {
             try {
                 const { data, error } = await supabase.from('files').select('*');
                 if (error) throw error;
                 preloadedData = data || [];
             } catch (err) {
-                logTerm("Cloud sync failed. Using offline storage.", "error");
+                // Only log error if we actually tried to connect
+                console.warn('Supabase connection failed, using offline storage');
                 const local = localStorage.getItem('split_ide_files');
                 if (local) preloadedData = JSON.parse(local);
             }

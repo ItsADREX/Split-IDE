@@ -6,7 +6,6 @@ import Header from './components/Header';
 import ExplorerPanel from './components/ExplorerPanel';
 import TerminalPanel from './components/TerminalPanel';
 import FileTabs from './components/FileTabs';
-import PullToRefresh from './components/PullToRefresh';
 import './index.css';
 
 const AIPanel = lazy(() => import('./components/AIPanel'));
@@ -36,15 +35,7 @@ export default function App() {
         await runCode(fs.activeFile, fs.content, logTerm);
     }, [fs.activeFile, fs.content, logTerm]);
 
-    const handleRefresh = useCallback(async () => {
-        // Simulate refresh delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        logTerm("App refreshed", "success");
-        // You can add actual refresh logic here like reloading files
-    }, [logTerm]);
-
     return (
-        <PullToRefresh onRefresh={handleRefresh}>
             <div className="flex flex-col h-full w-full">
                 <Header
                     panels={panels}
@@ -54,11 +45,13 @@ export default function App() {
                 />
 
                 <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-                    {/* Mobile Explorer Overlay */}
+                    {/* Explorer Panel - Desktop: Side by side, Mobile: Overlay */}
                     {panels.explorer && (
-                        <div className={`${panels.explorer ? 'block' : 'hidden'} md:block`}>
+                        <>
+                            {/* Mobile backdrop */}
                             <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => togglePanel('explorer')}></div>
-                            <div className="md:relative md:w-64 fixed md:static inset-y-0 left-0 z-50 w-80 md:z-auto">
+                            {/* Explorer Panel */}
+                            <div className="md:w-64 md:flex-shrink-0 fixed md:static inset-y-0 left-0 z-50 w-80 md:z-auto">
                                 <ExplorerPanel
                                     files={fs.files}
                                     activeFile={fs.activeFile}
@@ -75,7 +68,7 @@ export default function App() {
                                     duplicateFile={fs.duplicateFile}
                                 />
                             </div>
-                        </div>
+                        </>
                     )}
 
                     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -100,13 +93,10 @@ export default function App() {
 
                 {/* Mobile AI Panel Overlay */}
                 {panels.ai && (
-                    <div className={`${panels.ai ? 'block' : 'hidden'}`}>
-                        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => togglePanel('ai')}></div>
-                        <div className="md:relative md:w-80 fixed md:static inset-y-0 right-0 z-50 w-full md:z-auto">
-                            <Suspense fallback={null}>
-                                <AIPanel onClose={() => togglePanel('ai')} />
-                            </Suspense>
-                        </div>
+                    <div className="md:relative md:w-80 fixed md:static inset-y-0 right-0 z-50 w-full md:z-auto">
+                        <Suspense fallback={null}>
+                            <AIPanel onClose={() => togglePanel('ai')} />
+                        </Suspense>
                     </div>
                 )}
             </main>
@@ -118,6 +108,5 @@ export default function App() {
                     />
                 )}
             </div>
-        </PullToRefresh>
     );
 }

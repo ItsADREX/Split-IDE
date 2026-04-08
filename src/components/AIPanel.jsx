@@ -42,9 +42,22 @@ const AIPanel = memo(({ onClose }) => {
                 </div>
             </aside>
 
-            {/* Mobile AI Panel - Full Page Overlay */}
-            <div className="md:hidden fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--bg-panel)' }}>
-                <div className="flex justify-between items-center px-4 py-3 font-bold" style={{ backgroundColor: 'var(--bg-header)', borderBottom: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--color-muted)' }}>
+            {/* Mobile AI Panel - Bottom Sheet Overlay */}
+            <div className="md:hidden fixed inset-x-0 bottom-0 z-50 flex flex-col" style={{ 
+                backgroundColor: 'var(--bg-panel)',
+                height: '70vh',
+                borderTopLeftRadius: '16px',
+                borderTopRightRadius: '16px',
+                boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.3)'
+            }}>
+                <div className="flex justify-between items-center px-4 py-3 font-bold" style={{ 
+                    backgroundColor: 'var(--bg-header)', 
+                    borderBottom: '1px solid var(--border-color)', 
+                    fontSize: '0.8rem', 
+                    color: 'var(--color-muted)',
+                    borderTopLeftRadius: '16px',
+                    borderTopRightRadius: '16px'
+                }}>
                     <span className="flex items-center gap-2" style={{ color: 'var(--color-teal)' }}>
                         ✨ <span>SPLIT AI</span>
                     </span>

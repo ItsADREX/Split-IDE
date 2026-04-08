@@ -12,8 +12,9 @@ const createMockClient = () => ({
     })
 });
 
-export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY) 
+// Only create real client if both URL and key are properly configured
+export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'undefined' && SUPABASE_ANON_KEY !== 'undefined') 
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : createMockClient()
 
-export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_ANON_KEY)
+export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== 'undefined' && SUPABASE_ANON_KEY !== 'undefined')
