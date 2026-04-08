@@ -51,6 +51,11 @@ ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for projects
+DROP POLICY IF EXISTS "Users can view their own projects" ON projects;
+DROP POLICY IF EXISTS "Users can create their own projects" ON projects;
+DROP POLICY IF EXISTS "Users can update their own projects" ON projects;
+DROP POLICY IF EXISTS "Users can delete their own projects" ON projects;
+
 CREATE POLICY "Users can view their own projects" ON projects
     FOR SELECT USING (auth.uid() = user_id);
 
@@ -64,6 +69,11 @@ CREATE POLICY "Users can delete their own projects" ON projects
     FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for files
+DROP POLICY IF EXISTS "Users can view files in their projects" ON files;
+DROP POLICY IF EXISTS "Users can create files in their projects" ON files;
+DROP POLICY IF EXISTS "Users can update files in their projects" ON files;
+DROP POLICY IF EXISTS "Users can delete files in their projects" ON files;
+
 CREATE POLICY "Users can view files in their projects" ON files
     FOR SELECT USING (
         EXISTS (
@@ -101,6 +111,10 @@ CREATE POLICY "Users can delete files in their projects" ON files
     );
 
 -- RLS Policies for user preferences
+DROP POLICY IF EXISTS "Users can view their own preferences" ON user_preferences;
+DROP POLICY IF EXISTS "Users can create their own preferences" ON user_preferences;
+DROP POLICY IF EXISTS "Users can update their own preferences" ON user_preferences;
+
 CREATE POLICY "Users can view their own preferences" ON user_preferences
     FOR SELECT USING (auth.uid() = user_id);
 
@@ -126,6 +140,10 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS update_projects_updated_at ON projects;
+DROP TRIGGER IF EXISTS update_files_updated_at ON files;
+DROP TRIGGER IF EXISTS update_user_preferences_updated_at ON user_preferences;
+
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
