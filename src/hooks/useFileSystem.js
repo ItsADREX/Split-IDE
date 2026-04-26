@@ -322,19 +322,22 @@ export function useFileSystem(logTerm) {
     }, [logTerm, selectFile, syncToLocalStorage, syncToCloud]);
 
     const newFile = useCallback((filename) => {
-        if (files.includes(filename)) {
-            logTerm(`File ${filename} already exists`, "error");
+        const name = typeof filename === 'string' ? filename : prompt('File name (e.g. index.html):');
+        if (!name || !name.trim()) return;
+        const trimmed = name.trim();
+        if (files.includes(trimmed)) {
+            logTerm(`File ${trimmed} already exists`, "error");
             return;
         }
-        setFiles(prev => [...prev, filename].sort());
+        setFiles(prev => [...prev, trimmed].sort());
         setFileCache(prev => {
-            const nc = { ...prev, [filename]: '// New File\n' };
+            const nc = { ...prev, [trimmed]: '' };
             syncToLocalStorage(nc);
             syncToCloud(nc);
             return nc;
         });
-        selectFile(filename, '// New File\n');
-        logTerm(`Created ${filename}`, "success");
+        selectFile(trimmed, '');
+        logTerm(`Created ${trimmed}`, "success");
     }, [files, selectFile, syncToLocalStorage, syncToCloud, logTerm]);
 
     const newFolder = useCallback(() => {
@@ -556,6 +559,7 @@ export function useFileSystem(logTerm) {
         files,
         activeFile,
         content,
+        fileContents: fileCache,
         openFolders,
         openTabs,
         currentProject,

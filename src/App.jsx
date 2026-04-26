@@ -6,6 +6,7 @@ import Header from './components/Header';
 import ExplorerPanel from './components/ExplorerPanel';
 import TerminalPanel from './components/TerminalPanel';
 import FileTabs from './components/FileTabs';
+import SettingsModal from './components/SettingsModal';
 import './index.css';
 
 const AIPanel = lazy(() => import('./components/AIPanel'));
@@ -13,6 +14,8 @@ const EditorPane = lazy(() => import('./components/EditorPane'));
 
 export default function App() {
     const [panels, setPanels] = useState({ explorer: true, ai: false, terminal: false });
+    const [viewMode, setViewMode] = useState('code');
+    const [showSettings, setShowSettings] = useState(false);
 
     const { terminalLogs, logTerm } = useTerminal();
 
@@ -35,64 +38,84 @@ export default function App() {
         await runCode(fs.activeFile, fs.content, logTerm);
     }, [fs.activeFile, fs.content, logTerm]);
 
+    const handleViewModeChange = useCallback((mode) => {
+        setViewMode(mode);
+        if (mode === 'preview') {
+            setPanels(p => ({ ...p, terminal: true }));
+        }
+    }, []);
+
+    // Build files map for LivePreview: { basename: content }
+    const filesMap = Object.fromEntries(
+        (fs.files || [])
+            .filter(name => typeof name === 'string')
+            .map(name => [name.split('/').pop(), fs.fileContents?.[name] ?? ''])
+    );
+
     return (
-            <div className="flex flex-col h-full w-full">
-                <Header
-                    panels={panels}
-                    togglePanel={togglePanel}
-                    executeCode={handleExecute}
-                    uploadFile={fs.uploadFile}
-                    syncStatus={fs.syncStatus}
-                />
+        <div className="flex flex-col h-full w-full">
+            <Header
+                panels={panels}
+                togglePanel={togglePanel}
+                executeCode={handleExecute}
+                uploadFile={fs.uploadFile}
+                syncStatus={fs.syncStatus}
+                viewMode={viewMode}
+                onViewModeChange={handleViewModeChange}
+                onOpenSettings={() => setShowSettings(true)}
+            />
 
-                <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-                    {/* Explorer Panel - Desktop: Side by side, Mobile: Overlay */}
-                    {panels.explorer && (
-                        <>
-                            {/* Mobile backdrop */}
-                            <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => togglePanel('explorer')}></div>
-                            {/* Explorer Panel */}
-                            <div className="md:w-64 md:flex-shrink-0 fixed md:static inset-y-0 left-0 z-50 w-80 md:z-auto">
-                                <ExplorerPanel
-                                    files={fs.files}
-                                    activeFile={fs.activeFile}
-                                    openFolders={fs.openFolders}
-                                    selectFile={fs.selectFile}
-                                    toggleFolder={fs.toggleFolder}
-                                    handleDragStart={fs.handleDragStart}
-                                    handleDrop={fs.handleDrop}
-                                    newFile={fs.newFile}
-                                    newFolder={fs.newFolder}
-                                    uploadFile={fs.uploadFile}
-                                    deleteFile={fs.deleteFile}
-                                    renameFile={fs.renameFile}
-                                    duplicateFile={fs.duplicateFile}
-                                />
-                            </div>
-                        </>
-                    )}
-
-                    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                        <FileTabs
-                            openTabs={fs.openTabs}
-                            activeFile={fs.activeFile}
-                            onSelectTab={fs.selectFile}
-                            onCloseTab={fs.closeTab}
-                        />
-                        <Suspense fallback={
-                            <section className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)' }}>
-                                Loading editor...
-                            </section>
-                        }>
-                            <EditorPane
+            <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+                {/* Explorer Panel - Desktop: Side by side, Mobile: Overlay */}
+                {panels.explorer && (
+                    <>
+                        {/* Mobile backdrop */}
+                        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => togglePanel('explorer')}></div>
+                        {/* Explorer Panel */}
+                        <div className="md:w-64 md:flex-shrink-0 fixed md:static inset-y-0 left-0 z-50 w-80 md:z-auto">
+                            <ExplorerPanel
+                                files={fs.files}
                                 activeFile={fs.activeFile}
-                                content={fs.content}
-                                onChange={fs.handleEditorChange}
+                                openFolders={fs.openFolders}
+                                selectFile={fs.selectFile}
+                                toggleFolder={fs.toggleFolder}
+                                handleDragStart={fs.handleDragStart}
+                                handleDrop={fs.handleDrop}
+                                newFile={fs.newFile}
+                                newFolder={fs.newFolder}
+                                uploadFile={fs.uploadFile}
+                                deleteFile={fs.deleteFile}
+                                renameFile={fs.renameFile}
+                                duplicateFile={fs.duplicateFile}
                             />
-                        </Suspense>
-                    </div>
+                        </div>
+                    </>
+                )}
 
-                {/* Mobile AI Panel Overlay */}
+                <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                    <FileTabs
+                        openTabs={fs.openTabs}
+                        activeFile={fs.activeFile}
+                        onSelectTab={fs.selectFile}
+                        onCloseTab={fs.closeTab}
+                    />
+                    <Suspense fallback={
+                        <section className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-muted)' }}>
+                            Loading editor...
+                        </section>
+                    }>
+                        <EditorPane
+                            activeFile={fs.activeFile}
+                            content={fs.content}
+                            onChange={fs.handleEditorChange}
+                            viewMode={viewMode}
+                            files={filesMap}
+                            onConsoleOutput={logTermWithPanel}
+                        />
+                    </Suspense>
+                </div>
+
+                {/* AI Panel */}
                 {panels.ai && (
                     <div className="md:relative md:w-80 fixed md:static inset-y-0 right-0 z-50 w-full md:z-auto">
                         <Suspense fallback={null}>
@@ -102,12 +125,17 @@ export default function App() {
                 )}
             </main>
 
-                {panels.terminal && (
-                    <TerminalPanel
-                        terminalLogs={terminalLogs}
-                        onClose={() => togglePanel('terminal')}
-                    />
-                )}
-            </div>
+            {panels.terminal && (
+                <TerminalPanel
+                    terminalLogs={terminalLogs}
+                    onClose={() => togglePanel('terminal')}
+                />
+            )}
+
+            <SettingsModal
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+            />
+        </div>
     );
 }
